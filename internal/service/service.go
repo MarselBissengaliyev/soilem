@@ -11,6 +11,7 @@ type User interface {
 	Login(user *model.User) (*model.User, *model.Fail)
 	GetUserByUserName(userName model.UserName) (*model.User, *model.Fail)
 	GetUsers(searchTerm string, limit string) ([]*model.User, *model.Fail)
+	ConfirmSMSCode(userName model.UserName, providedCode model.SMSCode) (bool, *model.Fail)
 }
 
 type Session interface {
@@ -21,20 +22,21 @@ type Session interface {
 	GetUserAgent(token string) (string, bool)
 }
 
-type Twilo interface {
+type SMSCode interface {
 	SendSMSConfirmation(*model.User) *model.Fail
+	SetSMSCode(updateSMSCode model.SMSCode, userName model.UserName) (*model.SMSCode, *model.Fail)
 }
 
 type Service struct {
 	User
 	Session
-	Twilo
+	SMSCode
 }
 
 func NewService(r *repo.Repository, cfg *configs.Config) *Service {
 	return &Service{
 		User:    NewUserService(r),
 		Session: NewSessionService(),
-		Twilo:   NewTwiloService(cfg),
+		SMSCode: NewSMSCodeService(cfg, r),
 	}
 }

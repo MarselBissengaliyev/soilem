@@ -1,6 +1,7 @@
 package service
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -29,6 +30,20 @@ func (s *UserService) Registration(user *model.User) (*model.User, *model.Fail) 
 		}
 	}
 
+	_, err := s.repo.GetUserByUserName(user.UserName)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, &model.Fail{
+				Message:    err.Error(),
+				StatusCode: http.StatusNotFound,
+			}
+		}
+		return nil, &model.Fail{
+			Message:    err.Error(),
+			StatusCode: http.StatusInternalServerError,
+		}
+	}
+
 	hashedPassword, err := user.HashPassword()
 	if err != nil {
 		return nil, &model.Fail{
@@ -40,10 +55,9 @@ func (s *UserService) Registration(user *model.User) (*model.User, *model.Fail) 
 	user.Password = hashedPassword
 	user.CreatedAt = time.Now().UTC()
 	user.LastLoginAt = time.Now().UTC()
-	user.GenerateConfirmationCode()
 
-	foundUser, err := s.repo.Registration(user)
-	if err != nil || foundUser != nil {
+	registerUser, err := s.repo.CreateUser(user)
+	if err != nil || registerUser != nil {
 		if err == repo.ErrUserAlreadyExists {
 			return nil, &model.Fail{
 				Message:    err.Error(),
@@ -57,7 +71,7 @@ func (s *UserService) Registration(user *model.User) (*model.User, *model.Fail) 
 		}
 	}
 
-	return foundUser, nil
+	return registerUser, nil
 }
 
 func (s *UserService) Login(user *model.User) (*model.User, *model.Fail) {
@@ -151,4 +165,71 @@ func (s *UserService) GetUsers(searchTerm string, limit string) ([]*model.User, 
 	}
 
 	return users, nil
+}
+
+func (s *UserService) ConfirmSMSCode(userName model.UserName, providedCode model.SMSCode) (bool, *model.Fail) {
+	if err := providedCode.Validate(); err != nil {
+		return false, &model.Fail{
+			Message:    err.Error(),
+			StatusCode: http.StatusBadRequest,
+		}
+	}
+
+	foundUser, err := s.repo.GetUserByUserName(userName)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return false, &model.Fail{
+				Message:    err.Error(),
+				StatusCode: http.StatusNotFound,
+			}
+		}
+		return false, &model.Fail{
+			Message:    err.Error(),
+			StatusCode: http.StatusInternalServerError,
+		}
+	}
+
+	if foundUser.IsPhoneVerified {
+		return false, &model.Fail{
+			Message:    "phone number already verified",
+			StatusCode: http.StatusBadRequest,
+		}
+	}
+
+	if foundUser.SMSCode.IsExpired() {
+		return false, &model.Fail{
+			Message:    "confirmation code is expired",
+			StatusCode: http.StatusGone,
+		}
+	}
+
+	if foundUser.SMSCode.Code != providedCode.Code {
+		return false, &model.Fail{
+			Message:    "provided code does not match sms code",
+			StatusCode: http.StatusBadRequest,
+		}
+	}
+
+	confirmed, err := s.repo.SetPhoneVerifiedValue(true, foundUser.UserName)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return false, &model.Fail{
+				Message:    err.Error(),
+				StatusCode: http.StatusNotFound,
+			}
+		}
+		return false, &model.Fail{
+			Message:    fmt.Sprintf("failed to set phone status: %s", err.Error()),
+			StatusCode: http.StatusInternalServerError,
+		}
+	}
+
+	if !confirmed {
+		return false, &model.Fail{
+			Message:    err.Error(),
+			StatusCode: http.StatusInternalServerError,
+		}
+	}
+
+	return confirmed, nil
 }

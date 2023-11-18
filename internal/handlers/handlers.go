@@ -38,6 +38,7 @@ func initUserRoutes(rg *gin.RouterGroup, h *Handler, m *middleware.Middleware) {
 
 			privateRoutes := auth.Group("/", m.Authenticate)
 			{
+				privateRoutes.PUT("/confirm-smscode", h.confirmSMSCode)
 				privateRoutes.GET("/", h.logout)
 			}
 		}

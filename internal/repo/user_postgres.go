@@ -12,6 +12,7 @@ import (
 
 var (
 	ErrUserAlreadyExists = errors.New("user already exists")
+	ErrUserNotFound      = errors.New("user not found")
 )
 
 type UserPostgres struct {
@@ -22,32 +23,23 @@ func NewUserPostgres(db *pgx.Conn) *UserPostgres {
 	return &UserPostgres{db}
 }
 
-func (r *UserPostgres) Registration(user *model.User) (*model.User, error) {
-	var foundUser *model.User
+func (r *UserPostgres) CreateUser(user *model.User) (*model.User, error) {
+	var createdUser *model.User
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-
-	existUser, _ := r.GetUserByUserName(foundUser.UserName)
-	if existUser.UserName == foundUser.UserName {
-		return nil, ErrUserAlreadyExists
-	}
-
-	if existUser.PhoneNumber == foundUser.PhoneNumber {
-		return nil, ErrUserAlreadyExists
-	}
 
 	sql := fmt.Sprintf(
 		`INSERT INTO %s (phone_number, password, full_name, user_name) VALUES ($1, $2, $3, $4)`,
 		usersTable,
 	)
 
-	err := r.db.QueryRow(ctx, sql, user.PhoneNumber, user.Password, user.FullName, user.UserName).Scan(&foundUser)
+	err := r.db.QueryRow(ctx, sql, user.PhoneNumber, user.Password, user.FullName, user.UserName).Scan(&createdUser)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to insert user")
 	}
 
-	return foundUser, nil
+	return createdUser, nil
 }
 
 func (r *UserPostgres) GetUserByUserName(userName model.UserName) (*model.User, error) {
@@ -86,4 +78,21 @@ func (r *UserPostgres) GetUsers(searchTerm string, limit int) ([]*model.User, er
 	}
 
 	return users, nil
+}
+
+func (r *UserPostgres) SetPhoneVerifiedValue(status bool, userName model.UserName) (bool, error) {
+	var isPhoneVerified bool
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	sql := fmt.Sprintf(
+		"UPDATE %s SET is_phone_verified=$1 WHERE username=$2 RETURNING is_phone_verified",
+		usersTable,
+	)
+	if err := r.db.QueryRow(ctx, sql, status, userName).Scan(&isPhoneVerified); err != nil {
+		return false, errors.Wrap(err, "failed to update is_phone_verified value")
+	}
+
+	return isPhoneVerified, nil
 }

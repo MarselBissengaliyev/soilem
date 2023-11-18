@@ -1,8 +1,7 @@
 package model
 
 import (
-	"fmt"
-	"math/rand"
+	"net/mail"
 	"regexp"
 	"strings"
 	"time"
@@ -11,25 +10,24 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-var v = validator.New()
-
 type UserPhone string
 type UserName string
 type UserID uint
-
-type confirmationCode struct {
-	Code      string    `json:"code"`
-	ExpiresAt time.Time `json:"expires_at"`
-}
 
 type User struct {
 	ID UserID `json:"-"`
 
 	// Phone
-	PhoneNumber      UserPhone        `json:"phone_number"`
-	ConfirmationCode confirmationCode `json:"confirmation_code"`
-	IsPhoneVerified  bool             `json:"-"`
+	PhoneNumber     UserPhone `json:"phone_number"`
+	SMSCode         SMSCode   `json:"confirmation_code"`
+	IsPhoneVerified bool      `json:"-"`
 	// End Phone
+
+	// Email
+	Email           string    `json:"email" validate:"email"`
+	EmailCode       EmailCode `json:"email_code" validate:"email_code"`
+	IsEmailVerified bool      `json:"-"`
+	// End Email
 
 	Password       string    `json:"-" validate:"required"`
 	FullName       string    `json:"full_name" validate:"required"`
@@ -45,22 +43,27 @@ type User struct {
 
 func (u *User) Validate() error {
 	if u.IsRegistration {
-		if err := v.Var(u.PhoneNumber, "required"); err != nil {
-			return err
-		}
-
 		if err := v.Var(u.FullName, "required"); err != nil {
 			return err
 		}
 	}
 
-	if err := v.RegisterValidation("phone_number", func(fl validator.FieldLevel) bool {
+	err := v.RegisterValidation("phone_number", func(fl validator.FieldLevel) bool {
 		e164Regex := `^\+[1-9]\d{1,14}$`
 		re := regexp.MustCompile(e164Regex)
 		phone_number := strings.ReplaceAll(string(u.PhoneNumber), " ", "")
 
 		return re.Find([]byte(phone_number)) != nil
-	}); err != nil {
+	})
+	if err != nil {
+		return err
+	}
+
+	err = v.RegisterValidation("email", func(fl validator.FieldLevel) bool {
+		_, err := mail.ParseAddress(u.Email)
+		return err == nil
+	})
+	if err != nil {
 		return err
 	}
 
@@ -75,23 +78,4 @@ func (u *User) HashPassword() (string, error) {
 func (u *User) CheckPasswordHash(provivedPassword string) bool {
 	err := bcrypt.CompareHashAndPassword([]byte(u.Password), []byte(provivedPassword))
 	return err == nil
-}
-
-func (u *User) GenerateConfirmationCode() {
-	// Создаем новый источник случайных чисел с seed на основе текущего времени
-	source := rand.NewSource(time.Now().UnixNano())
-
-	// Создаем новый генератор случайных чисел на основе источника
-	randomGenerator := rand.New(source)
-
-	// Генерируем 6 случайных цифр
-	randomNumber := randomGenerator.Intn(1000000)
-
-	// Форматируем число как строку с шестью цифрами
-	randomString := fmt.Sprintf("%06d", randomNumber)
-
-	u.ConfirmationCode = confirmationCode{
-		Code:      randomString,
-		ExpiresAt: time.Now().Add(5 * time.Minute),
-	}
 }

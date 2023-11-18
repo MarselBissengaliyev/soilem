@@ -9,7 +9,9 @@ import (
 )
 
 const (
-	usersTable = "users"
+	usersTable     = "users"
+	smsCodeTable   = "sms_codes"
+	emailCodeTable = "email_codes"
 )
 
 type Config struct {

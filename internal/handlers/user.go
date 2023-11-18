@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/MarselBissengaliyev/soilem/internal/model"
+	"github.com/MarselBissengaliyev/soilem/internal/service"
 	"github.com/gin-gonic/gin"
 )
 
@@ -18,11 +19,6 @@ func (h *Handler) registration(ctx *gin.Context) {
 
 	foundUser, err := h.services.User.Registration(&user)
 	if err != nil {
-		newErrorResponse(ctx, err.StatusCode, err.Message)
-		return
-	}
-
-	if err = h.services.Twilo.SendSMSConfirmation(foundUser); err != nil {
 		newErrorResponse(ctx, err.StatusCode, err.Message)
 		return
 	}
@@ -119,5 +115,81 @@ func (h *Handler) getUsers(ctx *gin.Context) {
 
 	newDataResponse(ctx, http.StatusOK, dataResponse{
 		"users": users,
+	})
+}
+
+func (h *Handler) sendSMSCode(ctx *gin.Context) {
+	sessionToken, ok := ctx.Get("session_token")
+
+	if !ok {
+		ctx.Status(http.StatusInternalServerError)
+		return
+	}
+
+	userName, ok := h.services.Session.GetUserName(sessionToken.(string))
+	if !ok {
+		ctx.Status(http.StatusInternalServerError)
+		return
+	}
+
+	foundUser, err := h.services.User.GetUserByUserName((model.UserName(userName)))
+	if err != nil {
+		newErrorResponse(ctx, err.StatusCode, err.Message)
+		return
+	}
+
+	foundUser.SMSCode.GenerateConfirmationCode(foundUser.UserName)
+
+	_, err = h.services.SMSCode.SetSMSCode(foundUser.SMSCode, foundUser.UserName)
+	if err != nil {
+		newErrorResponse(ctx, err.StatusCode, err.Message)
+		return
+	}
+
+	if err := h.services.SMSCode.SendSMSConfirmation(&service.SMS{
+		
+	}); err != nil {
+		newErrorResponse(ctx, err.StatusCode, err.Message)
+		return
+	}
+
+	newDataResponse(ctx, http.StatusOK, dataResponse{
+		"message": "sms confirmation sended succefully",
+	})
+}
+
+func (h *Handler) confirmSMSCode(ctx *gin.Context) {
+	sessionToken, ok := ctx.Get("session_token")
+	if !ok {
+		ctx.Status(http.StatusUnauthorized)
+		return
+	}
+
+	userName, ok := h.services.Session.GetUserName(sessionToken.(string))
+	if !ok {
+		ctx.Status(http.StatusUnauthorized)
+		return
+	}
+
+	var smsCode model.SMSCode
+
+	if err := ctx.BindJSON(&smsCode); err != nil {
+		newErrorResponse(ctx, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	confirmed, err := h.services.User.ConfirmSMSCode(model.UserName(userName), smsCode)
+	if err != nil {
+		newErrorResponse(ctx, err.StatusCode, err.Message)
+		return
+	}
+
+	if !confirmed {
+		newErrorResponse(ctx, http.StatusInternalServerError, "failed to confirm sms code")
+		return
+	}
+
+	newDataResponse(ctx, http.StatusOK, dataResponse{
+		"message": "sms code succefully confirmed",
 	})
 }
