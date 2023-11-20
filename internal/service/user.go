@@ -198,7 +198,7 @@ func (s *UserService) ConfirmSMSCode(userName model.UserName, providedCode model
 
 	if foundUser.SMSCode.IsExpired() {
 		return false, &model.Fail{
-			Message:    "confirmation code is expired",
+			Message:    "phone confirmation code is expired",
 			StatusCode: http.StatusGone,
 		}
 	}
@@ -220,6 +220,73 @@ func (s *UserService) ConfirmSMSCode(userName model.UserName, providedCode model
 		}
 		return false, &model.Fail{
 			Message:    fmt.Sprintf("failed to set phone status: %s", err.Error()),
+			StatusCode: http.StatusInternalServerError,
+		}
+	}
+
+	if !confirmed {
+		return false, &model.Fail{
+			Message:    err.Error(),
+			StatusCode: http.StatusInternalServerError,
+		}
+	}
+
+	return confirmed, nil
+}
+
+func (s *UserService) ConfirmEmailCode(userName model.UserName, providedCode model.EmailCode) (bool, *model.Fail) {
+	if err := providedCode.Validate(); err != nil {
+		return false, &model.Fail{
+			Message:    err.Error(),
+			StatusCode: http.StatusBadRequest,
+		}
+	}
+
+	foundUser, err := s.repo.GetUserByUserName(userName)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return false, &model.Fail{
+				Message:    err.Error(),
+				StatusCode: http.StatusNotFound,
+			}
+		}
+		return false, &model.Fail{
+			Message:    err.Error(),
+			StatusCode: http.StatusInternalServerError,
+		}
+	}
+
+	if foundUser.IsEmailVerified {
+		return false, &model.Fail{
+			Message:    "email already verified",
+			StatusCode: http.StatusBadRequest,
+		}
+	}
+
+	if foundUser.EmailCode.IsExpired() {
+		return false, &model.Fail{
+			Message:    "email confirmation code is expired",
+			StatusCode: http.StatusGone,
+		}
+	}
+
+	if foundUser.EmailCode.Code != providedCode.Code {
+		return false, &model.Fail{
+			Message:    "provided code does not match email code",
+			StatusCode: http.StatusBadRequest,
+		}
+	}
+
+	confirmed, err := s.repo.SetEmailVerifiedValue(true, foundUser.UserName)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return false, &model.Fail{
+				Message:    err.Error(),
+				StatusCode: http.StatusNotFound,
+			}
+		}
+		return false, &model.Fail{
+			Message:    fmt.Sprintf("failed to set email status: %s", err.Error()),
 			StatusCode: http.StatusInternalServerError,
 		}
 	}

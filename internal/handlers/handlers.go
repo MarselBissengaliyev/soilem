@@ -35,12 +35,15 @@ func initUserRoutes(rg *gin.RouterGroup, h *Handler, m *middleware.Middleware) {
 		{
 			auth.POST("/registration", h.registration)
 			auth.POST("/login", h.login)
+		}
 
-			privateRoutes := auth.Group("/", m.Authenticate)
-			{
-				privateRoutes.PUT("/confirm-smscode", h.confirmSMSCode)
-				privateRoutes.GET("/", h.logout)
-			}
+		privateRoutes := auth.Group("/", m.Authenticate)
+		{
+			privateRoutes.POST("/send-smscode", h.sendSMSCode)
+			privateRoutes.POST("/send-emailcode", h.sendEmailCode)
+			privateRoutes.PUT("/confirm-smscode", h.confirmSMSCode)
+			privateRoutes.PUT("/confirm-emailcode", h.confirmEmailCode)
+			privateRoutes.GET("/logout", h.logout)
 		}
 	}
 }

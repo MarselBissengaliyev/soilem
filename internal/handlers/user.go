@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/MarselBissengaliyev/soilem/internal/model"
-	"github.com/MarselBissengaliyev/soilem/internal/service"
 	"github.com/gin-gonic/gin"
 )
 
@@ -140,15 +139,13 @@ func (h *Handler) sendSMSCode(ctx *gin.Context) {
 
 	foundUser.SMSCode.GenerateConfirmationCode(foundUser.UserName)
 
-	_, err = h.services.SMSCode.SetSMSCode(foundUser.SMSCode, foundUser.UserName)
+	smsCode, err := h.services.SMSCode.SetSMSCode(foundUser.SMSCode, foundUser.UserName)
 	if err != nil {
 		newErrorResponse(ctx, err.StatusCode, err.Message)
 		return
 	}
 
-	if err := h.services.SMSCode.SendSMSConfirmation(&service.SMS{
-		
-	}); err != nil {
+	if err := h.services.SMSCode.SendSMSConfirmation(foundUser.PhoneNumber, smsCode.Code); err != nil {
 		newErrorResponse(ctx, err.StatusCode, err.Message)
 		return
 	}
@@ -191,5 +188,83 @@ func (h *Handler) confirmSMSCode(ctx *gin.Context) {
 
 	newDataResponse(ctx, http.StatusOK, dataResponse{
 		"message": "sms code succefully confirmed",
+	})
+}
+
+func (h *Handler) sendEmailCode(ctx *gin.Context) {
+	sessionToken, ok := ctx.Get("session_token")
+
+	if !ok {
+		ctx.Status(http.StatusInternalServerError)
+		return
+	}
+
+	userName, ok := h.services.Session.GetUserName(sessionToken.(string))
+	if !ok {
+		ctx.Status(http.StatusInternalServerError)
+		return
+	}
+
+	foundUser, err := h.services.User.GetUserByUserName((model.UserName(userName)))
+	if err != nil {
+		newErrorResponse(ctx, err.StatusCode, err.Message)
+		return
+	}
+
+	foundUser.EmailCode.GenerateConfirmationCode(foundUser.UserName)
+
+	emailCode, err := h.services.EmailCode.SetEmailCode(foundUser.EmailCode, foundUser.UserName)
+	if err != nil {
+		newErrorResponse(ctx, err.StatusCode, err.Message)
+		return
+	}
+
+	if err := h.services.EmailCode.SendEmailCode(
+		"../../templates/email_confirm.html",
+		foundUser.Email,
+		emailCode.Code,
+	); err != nil {
+		newErrorResponse(ctx, err.StatusCode, err.Message)
+		return
+	}
+
+	newDataResponse(ctx, http.StatusOK, dataResponse{
+		"message": "email confirmation sended succefully",
+	})
+}
+
+func (h *Handler) confirmEmailCode(ctx *gin.Context) {
+	sessionToken, ok := ctx.Get("session_token")
+	if !ok {
+		ctx.Status(http.StatusUnauthorized)
+		return
+	}
+
+	userName, ok := h.services.Session.GetUserName(sessionToken.(string))
+	if !ok {
+		ctx.Status(http.StatusUnauthorized)
+		return
+	}
+
+	var emailCode model.EmailCode
+
+	if err := ctx.BindJSON(&emailCode); err != nil {
+		newErrorResponse(ctx, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	confirmed, err := h.services.User.ConfirmEmailCode(model.UserName(userName), emailCode)
+	if err != nil {
+		newErrorResponse(ctx, err.StatusCode, err.Message)
+		return
+	}
+
+	if !confirmed {
+		newErrorResponse(ctx, http.StatusInternalServerError, "failed to confirm email code")
+		return
+	}
+
+	newDataResponse(ctx, http.StatusOK, dataResponse{
+		"message": "email code succefully confirmed",
 	})
 }

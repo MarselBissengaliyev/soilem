@@ -96,3 +96,20 @@ func (r *UserPostgres) SetPhoneVerifiedValue(status bool, userName model.UserNam
 
 	return isPhoneVerified, nil
 }
+
+func (r *UserPostgres) SetEmailVerifiedValue(status bool, userName model.UserName) (bool, error) {
+	var isEmailVerified bool
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	sql := fmt.Sprintf(
+		"UPDATE %s SET is_email_verified=$1 WHERE username=$2 RETURNING is_email_verified",
+		usersTable,
+	)
+	if err := r.db.QueryRow(ctx, sql, status, userName).Scan(&isEmailVerified); err != nil {
+		return false, errors.Wrap(err, "failed to update is_email_verified value")
+	}
+
+	return isEmailVerified, nil
+}

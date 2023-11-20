@@ -19,6 +19,12 @@ type Config struct {
 		AuthToken  string
 		FromNumber string
 	}
+	Gmail struct {
+		Password string
+		Username string
+		Host     string
+		Port     int
+	}
 }
 
 func InitConfig(path string, ctype string, name string) (*Config, error) {

@@ -54,7 +54,7 @@ func (s *SMSCodeService) SetSMSCode(
 	return smsCode, nil
 }
 
-func (s *SMSCodeService) SendSMSConfirmation(user *model.User) *model.Fail {
+func (s *SMSCodeService) SendSMSConfirmation(to model.UserPhone, code int) *model.Fail {
 	cfg := s.cfg.Twilio
 
 	client := twilio.NewRestClientWithParams(twilio.ClientParams{
@@ -62,17 +62,17 @@ func (s *SMSCodeService) SendSMSConfirmation(user *model.User) *model.Fail {
 		Password: cfg.AuthToken,
 	})
 
-	messageBody := fmt.Sprintf("Your confirmation code is: %v", user.SMSCode)
+	messageBody := fmt.Sprintf("Your confirmation code is: %v", code)
 
 	params := &twilioApi.CreateMessageParams{}
-	params.SetTo(string(user.PhoneNumber))
+	params.SetTo(string(to))
 	params.SetFrom(cfg.FromNumber)
 	params.SetBody(messageBody)
 
 	_, err := client.Api.CreateMessage(params)
 	if err != nil {
 		return &model.Fail{
-			Message:    fmt.Sprintf("failed to send message to number: %s, error: %s", user.PhoneNumber, err.Error()),
+			Message:    fmt.Sprintf("failed to send message to number: %s, error: %s", to, err.Error()),
 			StatusCode: http.StatusInternalServerError,
 		}
 	}

@@ -10,6 +10,7 @@ type User interface {
 	GetUserByUserName(userName model.UserName) (*model.User, error)
 	GetUsers(searchTerm string, limit int) ([]*model.User, error)
 	SetPhoneVerifiedValue(status bool, userName model.UserName) (bool, error)
+	SetEmailVerifiedValue(status bool, userName model.UserName) (bool, error)
 }
 
 type SMSCode interface {

@@ -12,6 +12,7 @@ type User interface {
 	GetUserByUserName(userName model.UserName) (*model.User, *model.Fail)
 	GetUsers(searchTerm string, limit string) ([]*model.User, *model.Fail)
 	ConfirmSMSCode(userName model.UserName, providedCode model.SMSCode) (bool, *model.Fail)
+	ConfirmEmailCode(userName model.UserName, providedCode model.EmailCode) (bool, *model.Fail)
 }
 
 type Session interface {
@@ -23,20 +24,27 @@ type Session interface {
 }
 
 type SMSCode interface {
-	SendSMSConfirmation(*model.User) *model.Fail
+	SendSMSConfirmation(to model.UserPhone, code int) *model.Fail
 	SetSMSCode(updateSMSCode model.SMSCode, userName model.UserName) (*model.SMSCode, *model.Fail)
+}
+
+type EmailCode interface {
+	SetEmailCode(updateEmailCode model.EmailCode, userName model.UserName) (*model.EmailCode, *model.Fail)
+	SendEmailCode(templatePath string, to string, code int) *model.Fail
 }
 
 type Service struct {
 	User
 	Session
 	SMSCode
+	EmailCode
 }
 
 func NewService(r *repo.Repository, cfg *configs.Config) *Service {
 	return &Service{
-		User:    NewUserService(r),
-		Session: NewSessionService(),
-		SMSCode: NewSMSCodeService(cfg, r),
+		User:      NewUserService(r),
+		Session:   NewSessionService(),
+		SMSCode:   NewSMSCodeService(cfg, r),
+		EmailCode: NewEmailCodeService(cfg, r),
 	}
 }
