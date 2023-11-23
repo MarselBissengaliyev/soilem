@@ -12,6 +12,7 @@ const (
 	usersTable     = "users"
 	smsCodeTable   = "sms_codes"
 	emailCodeTable = "email_codes"
+	profilesTable  = "profiles"
 )
 
 type Config struct {

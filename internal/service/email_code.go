@@ -15,10 +15,10 @@ import (
 
 type EmailCodeService struct {
 	cfg  *configs.Config
-	repo *repo.Repository
+	repo repo.EmailCode
 }
 
-func NewEmailCodeService(cfg *configs.Config, repo *repo.Repository) *EmailCodeService {
+func NewEmailCodeService(cfg *configs.Config, repo repo.EmailCode) *EmailCodeService {
 	return &EmailCodeService{cfg: cfg, repo: repo}
 }
 
@@ -33,7 +33,7 @@ func (s *EmailCodeService) SetEmailCode(
 		}
 	}
 
-	emailCode, err := s.repo.EmailCode.SetEmailCode(updateEmailCode, userName)
+	emailCode, err := s.repo.SetCode(updateEmailCode, userName)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, &model.Fail{

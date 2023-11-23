@@ -268,3 +268,23 @@ func (h *Handler) confirmEmailCode(ctx *gin.Context) {
 		"message": "email code succefully confirmed",
 	})
 }
+
+func (h *Handler) updatePasswordByEmailCode(ctx *gin.Context) {
+
+}
+
+func (h *Handler) updatePasswordBySMSCode(ctx *gin.Context) {
+
+}
+
+func (h *Handler) updateEmail(ctx *gin.Context) {
+
+}
+
+func (h *Handler) updatePhone(ctx *gin.Context) {
+
+}
+
+func (h *Handler) updateFullName(ctx *gin.Context) {
+
+}

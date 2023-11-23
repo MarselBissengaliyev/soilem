@@ -23,18 +23,28 @@ func NewUserPostgres(db *pgx.Conn) *UserPostgres {
 	return &UserPostgres{db}
 }
 
-func (r *UserPostgres) CreateUser(user *model.User) (*model.User, error) {
+func (r *UserPostgres) Create(user *model.User) (*model.User, error) {
 	var createdUser *model.User
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	sql := fmt.Sprintf(
-		`INSERT INTO %s (phone_number, password, full_name, user_name) VALUES ($1, $2, $3, $4)`,
+		`INSERT INTO %s (phone_number, password, user_name) VALUES ($1, $2, $4)`,
 		usersTable,
 	)
 
-	err := r.db.QueryRow(ctx, sql, user.PhoneNumber, user.Password, user.FullName, user.UserName).Scan(&createdUser)
+	tx, err := r.db.Begin(ctx)
+	defer tx.Rollback(ctx)
+
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to begin transaction")
+	}
+
+	err = tx.QueryRow(
+		ctx, sql,
+		user.PhoneNumber, user.Password, user.UserName,
+	).Scan(&createdUser)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to insert user")
 	}
@@ -42,7 +52,7 @@ func (r *UserPostgres) CreateUser(user *model.User) (*model.User, error) {
 	return createdUser, nil
 }
 
-func (r *UserPostgres) GetUserByUserName(userName model.UserName) (*model.User, error) {
+func (r *UserPostgres) GetByUserName(userName model.UserName) (*model.User, error) {
 	var foundUser *model.User
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -59,7 +69,7 @@ func (r *UserPostgres) GetUserByUserName(userName model.UserName) (*model.User, 
 	return foundUser, nil
 }
 
-func (r *UserPostgres) GetUsers(searchTerm string, limit int) ([]*model.User, error) {
+func (r *UserPostgres) GetAll(searchTerm string, limit int) ([]*model.User, error) {
 	var users []*model.User
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)

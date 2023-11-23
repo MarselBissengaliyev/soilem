@@ -15,7 +15,8 @@ type UserName string
 type UserID uint
 
 type User struct {
-	ID UserID `json:"-"`
+	ID       UserID   `json:"-"`
+	UserName UserName `json:"user_name" validate:"required"`
 
 	// Phone
 	PhoneNumber     UserPhone `json:"phone_number"`
@@ -29,25 +30,18 @@ type User struct {
 	IsEmailVerified bool      `json:"-"`
 	// End Email
 
-	Password       string    `json:"-" validate:"required"`
-	FullName       string    `json:"full_name" validate:"required"`
-	UserName       UserName  `json:"user_name" validate:"required"`
-	Description    string    `json:"description"`
-	Avatar         string    `json:"avatar"`
-	DateOfBirth    time.Time `json:"birth_of_date" validate:"required"`
-	Sex            string    `json:"sex" validate:"required, oneof=male female"`
+	Password string `json:"-" validate:"required"`
+
+	// Profile
+	Profile Profile `json:"profile"`
+	// End Profile
+
 	CreatedAt      time.Time `json:"-"`
 	LastLoginAt    time.Time `json:"-"`
 	IsRegistration bool      `json:"-"`
 }
 
 func (u *User) Validate() error {
-	if u.IsRegistration {
-		if err := v.Var(u.FullName, "required"); err != nil {
-			return err
-		}
-	}
-
 	err := v.RegisterValidation("phone_number", func(fl validator.FieldLevel) bool {
 		e164Regex := `^\+[1-9]\d{1,14}$`
 		re := regexp.MustCompile(e164Regex)

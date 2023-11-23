@@ -30,7 +30,7 @@ func (s *UserService) Registration(user *model.User) (*model.User, *model.Fail) 
 		}
 	}
 
-	_, err := s.repo.GetUserByUserName(user.UserName)
+	_, err := s.repo.GetByUserName(user.UserName)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, &model.Fail{
@@ -56,7 +56,7 @@ func (s *UserService) Registration(user *model.User) (*model.User, *model.Fail) 
 	user.CreatedAt = time.Now().UTC()
 	user.LastLoginAt = time.Now().UTC()
 
-	registerUser, err := s.repo.CreateUser(user)
+	registerUser, err := s.repo.Create(user)
 	if err != nil || registerUser != nil {
 		if err == repo.ErrUserAlreadyExists {
 			return nil, &model.Fail{
@@ -70,6 +70,7 @@ func (s *UserService) Registration(user *model.User) (*model.User, *model.Fail) 
 			StatusCode: http.StatusInternalServerError,
 		}
 	}
+	// createProfile, err := 
 
 	return registerUser, nil
 }
@@ -84,7 +85,7 @@ func (s *UserService) Login(user *model.User) (*model.User, *model.Fail) {
 
 	user.LastLoginAt = time.Now().UTC()
 
-	foundUser, err := s.repo.GetUserByUserName(user.UserName)
+	foundUser, err := s.repo.GetByUserName(user.UserName)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, &model.Fail{
@@ -116,7 +117,7 @@ func (s *UserService) GetUserByUserName(userName model.UserName) (*model.User, *
 		}
 	}
 
-	foundUser, err := s.repo.GetUserByUserName(userName)
+	foundUser, err := s.repo.GetByUserName(userName)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, &model.Fail{
@@ -156,7 +157,7 @@ func (s *UserService) GetUsers(searchTerm string, limit string) ([]*model.User, 
 		}
 	}
 
-	users, err := s.repo.GetUsers(searchTerm, limitInt)
+	users, err := s.repo.GetAll(searchTerm, limitInt)
 	if err != nil {
 		return nil, &model.Fail{
 			Message:    "failed to get users: " + err.Error(),
@@ -175,7 +176,7 @@ func (s *UserService) ConfirmSMSCode(userName model.UserName, providedCode model
 		}
 	}
 
-	foundUser, err := s.repo.GetUserByUserName(userName)
+	foundUser, err := s.repo.GetByUserName(userName)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return false, &model.Fail{
@@ -242,7 +243,7 @@ func (s *UserService) ConfirmEmailCode(userName model.UserName, providedCode mod
 		}
 	}
 
-	foundUser, err := s.repo.GetUserByUserName(userName)
+	foundUser, err := s.repo.GetByUserName(userName)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return false, &model.Fail{

@@ -18,7 +18,7 @@ func NewEmailCodePostgres(db *pgx.Conn) *EmailCodePostgres {
 	return &EmailCodePostgres{db}
 }
 
-func (r *EmailCodePostgres) SetEmailCode(
+func (r *EmailCodePostgres) SetCode(
 	updateEmailCode model.EmailCode,
 	userName model.UserName,
 ) (*model.EmailCode, error) {

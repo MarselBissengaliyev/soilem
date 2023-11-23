@@ -42,9 +42,9 @@ type Service struct {
 
 func NewService(r *repo.Repository, cfg *configs.Config) *Service {
 	return &Service{
-		User:      NewUserService(r),
+		User:      NewUserService(r.User),
 		Session:   NewSessionService(),
-		SMSCode:   NewSMSCodeService(cfg, r),
-		EmailCode: NewEmailCodeService(cfg, r),
+		SMSCode:   NewSMSCodeService(cfg, r.SMSCode),
+		EmailCode: NewEmailCodeService(cfg, r.EmailCode),
 	}
 }

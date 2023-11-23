@@ -15,10 +15,10 @@ import (
 
 type SMSCodeService struct {
 	cfg  *configs.Config
-	repo *repo.Repository
+	repo repo.SMSCode
 }
 
-func NewSMSCodeService(cfg *configs.Config, repo *repo.Repository) *SMSCodeService {
+func NewSMSCodeService(cfg *configs.Config, repo repo.SMSCode) *SMSCodeService {
 	return &SMSCodeService{
 		cfg:  cfg,
 		repo: repo,
@@ -36,7 +36,7 @@ func (s *SMSCodeService) SetSMSCode(
 		}
 	}
 
-	smsCode, err := s.repo.SMSCode.SetSMSCode(updateSMSCode, userName)
+	smsCode, err := s.repo.SetCode(updateSMSCode, userName)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, &model.Fail{

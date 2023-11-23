@@ -18,7 +18,7 @@ func NewSMSCodePostgres(db *pgx.Conn) *SMSCodePostgres {
 	return &SMSCodePostgres{db}
 }
 
-func (r *SMSCodePostgres) SetSMSCode(updateSMSCode model.SMSCode, userName model.UserName) (*model.SMSCode, error) {
+func (r *SMSCodePostgres) SetCode(updateSMSCode model.SMSCode, userName model.UserName) (*model.SMSCode, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
