@@ -4,12 +4,13 @@ import (
 	"github.com/MarselBissengaliyev/soilem/configs"
 	"github.com/MarselBissengaliyev/soilem/internal/model"
 	"github.com/MarselBissengaliyev/soilem/internal/repo"
+	"github.com/jackc/pgx/v5"
 )
 
 type User interface {
-	Registration(user *model.User) (*model.User, *model.Fail)
+	Registration(user *model.User) (*model.User, pgx.Tx, *model.Fail)
 	Login(user *model.User) (*model.User, *model.Fail)
-	GetUserByUserName(userName model.UserName) (*model.User, *model.Fail)
+	GetByUserName(userName model.UserName) (*model.User, *model.Fail)
 	GetUsers(searchTerm string, limit string) ([]*model.User, *model.Fail)
 	ConfirmSMSCode(userName model.UserName, providedCode model.SMSCode) (bool, *model.Fail)
 	ConfirmEmailCode(userName model.UserName, providedCode model.EmailCode) (bool, *model.Fail)
@@ -33,11 +34,21 @@ type EmailCode interface {
 	SendEmailCode(templatePath string, to string, code int) *model.Fail
 }
 
+type Profile interface {
+	Create(profile *model.Profile) (*model.Profile, *model.Fail)
+}
+
+type Post interface {
+	Create(post *model.Post, userName model.UserName) (*model.Post, *model.Fail)
+}
+
 type Service struct {
 	User
 	Session
 	SMSCode
 	EmailCode
+	Profile
+	Post
 }
 
 func NewService(r *repo.Repository, cfg *configs.Config) *Service {
@@ -46,5 +57,7 @@ func NewService(r *repo.Repository, cfg *configs.Config) *Service {
 		Session:   NewSessionService(),
 		SMSCode:   NewSMSCodeService(cfg, r.SMSCode),
 		EmailCode: NewEmailCodeService(cfg, r.EmailCode),
+		Profile:   NewProfileService(r.Profile),
+		Post:      NewPostService(r.Post),
 	}
 }

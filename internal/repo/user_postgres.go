@@ -23,7 +23,7 @@ func NewUserPostgres(db *pgx.Conn) *UserPostgres {
 	return &UserPostgres{db}
 }
 
-func (r *UserPostgres) Create(user *model.User) (*model.User, error) {
+func (r *UserPostgres) Create(user *model.User) (*model.User, pgx.Tx, error) {
 	var createdUser *model.User
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -35,10 +35,9 @@ func (r *UserPostgres) Create(user *model.User) (*model.User, error) {
 	)
 
 	tx, err := r.db.Begin(ctx)
-	defer tx.Rollback(ctx)
 
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to begin transaction")
+		return nil, nil, errors.Wrap(err, "failed to begin transaction")
 	}
 
 	err = tx.QueryRow(
@@ -46,10 +45,10 @@ func (r *UserPostgres) Create(user *model.User) (*model.User, error) {
 		user.PhoneNumber, user.Password, user.UserName,
 	).Scan(&createdUser)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to insert user")
+		return nil, nil, errors.Wrap(err, "failed to insert user")
 	}
 
-	return createdUser, nil
+	return createdUser, tx, nil
 }
 
 func (r *UserPostgres) GetByUserName(userName model.UserName) (*model.User, error) {

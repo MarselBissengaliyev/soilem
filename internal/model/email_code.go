@@ -9,7 +9,7 @@ type EmailCode struct {
 	ID        uint      `json:"-"`
 	Code      int       `json:"code" validate:"required,len:6,numeric"`
 	ExpiresAt time.Time `json:"-"`
-	UserName  UserName  `json:"-"`
+	UserName  UserName  `json:"user_name"`
 }
 
 func (c *EmailCode) IsExpired() bool {

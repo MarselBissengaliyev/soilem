@@ -21,12 +21,12 @@ func (h *Handler) InitRoutes() *gin.Engine {
 
 	v1 := router.Group("/api/v1")
 
-	initUserRoutes(v1, h, m)
+	initUserRoutes(v1, NewUserHandler(h.services), m)
 
 	return router
 }
 
-func initUserRoutes(rg *gin.RouterGroup, h *Handler, m *middleware.Middleware) {
+func initUserRoutes(rg *gin.RouterGroup, h *UserHandler, m *middleware.Middleware) {
 	users := rg.Group("/users")
 	{
 		users.GET("/:user_name", h.getUserByUserName)
@@ -37,13 +37,24 @@ func initUserRoutes(rg *gin.RouterGroup, h *Handler, m *middleware.Middleware) {
 			auth.POST("/login", h.login)
 		}
 
-		privateRoutes := auth.Group("/", m.Authenticate)
+		privateRoutes := users.Group("/", m.Authenticate)
 		{
 			privateRoutes.POST("/send-smscode", h.sendSMSCode)
 			privateRoutes.POST("/send-emailcode", h.sendEmailCode)
 			privateRoutes.PUT("/confirm-smscode", h.confirmSMSCode)
 			privateRoutes.PUT("/confirm-emailcode", h.confirmEmailCode)
 			privateRoutes.GET("/logout", h.logout)
+		}
+	}
+}
+
+func initPostRoutes(rg *gin.RouterGroup, h *PostHandler, m *middleware.Middleware) {
+	posts := rg.Group("/posts")
+	{
+		posts.GET("/:slug")
+		privateRoutes := posts.Group("/", m.Authenticate)
+		{
+			privateRoutes.POST("/", h.createPost)
 		}
 	}
 }

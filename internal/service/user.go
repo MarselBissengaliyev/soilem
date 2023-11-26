@@ -20,11 +20,11 @@ func NewUserService(repo repo.User) *UserService {
 	return &UserService{repo: repo}
 }
 
-func (s *UserService) Registration(user *model.User) (*model.User, *model.Fail) {
+func (s *UserService) Registration(user *model.User) (*model.User, pgx.Tx, *model.Fail) {
 	user.IsRegistration = true
 
 	if err := user.Validate(); err != nil {
-		return nil, &model.Fail{
+		return nil, nil, &model.Fail{
 			Message:    err.Error(),
 			StatusCode: http.StatusBadRequest,
 		}
@@ -33,12 +33,12 @@ func (s *UserService) Registration(user *model.User) (*model.User, *model.Fail) 
 	_, err := s.repo.GetByUserName(user.UserName)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, &model.Fail{
+			return nil, nil, &model.Fail{
 				Message:    err.Error(),
 				StatusCode: http.StatusNotFound,
 			}
 		}
-		return nil, &model.Fail{
+		return nil, nil, &model.Fail{
 			Message:    err.Error(),
 			StatusCode: http.StatusInternalServerError,
 		}
@@ -46,7 +46,7 @@ func (s *UserService) Registration(user *model.User) (*model.User, *model.Fail) 
 
 	hashedPassword, err := user.HashPassword()
 	if err != nil {
-		return nil, &model.Fail{
+		return nil, nil, &model.Fail{
 			Message:    "failed to hash password: " + err.Error(),
 			StatusCode: http.StatusInternalServerError,
 		}
@@ -56,23 +56,22 @@ func (s *UserService) Registration(user *model.User) (*model.User, *model.Fail) 
 	user.CreatedAt = time.Now().UTC()
 	user.LastLoginAt = time.Now().UTC()
 
-	registerUser, err := s.repo.Create(user)
+	registerUser, tx, err := s.repo.Create(user)
 	if err != nil || registerUser != nil {
 		if err == repo.ErrUserAlreadyExists {
-			return nil, &model.Fail{
+			return nil, nil, &model.Fail{
 				Message:    err.Error(),
 				StatusCode: http.StatusConflict,
 			}
 		}
 
-		return nil, &model.Fail{
+		return nil, nil, &model.Fail{
 			Message:    "failed to register user: " + err.Error(),
 			StatusCode: http.StatusInternalServerError,
 		}
 	}
-	// createProfile, err := 
 
-	return registerUser, nil
+	return registerUser, tx, nil
 }
 
 func (s *UserService) Login(user *model.User) (*model.User, *model.Fail) {
@@ -109,7 +108,7 @@ func (s *UserService) Login(user *model.User) (*model.User, *model.Fail) {
 	return foundUser, nil
 }
 
-func (s *UserService) GetUserByUserName(userName model.UserName) (*model.User, *model.Fail) {
+func (s *UserService) GetByUserName(userName model.UserName) (*model.User, *model.Fail) {
 	if userName == "" {
 		return nil, &model.Fail{
 			Message:    "user_name field cannot is empty",

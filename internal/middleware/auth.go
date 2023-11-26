@@ -27,8 +27,6 @@ func (m *Middleware) Authenticate(ctx *gin.Context) {
 		return
 	}
 
-	
-
 	ctx.Set("session_token", sessionToken)
 
 	ctx.Next()

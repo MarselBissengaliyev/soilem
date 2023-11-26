@@ -33,7 +33,8 @@ func (s *EmailCodeService) SetEmailCode(
 		}
 	}
 
-	emailCode, err := s.repo.SetCode(updateEmailCode, userName)
+	updateEmailCode.UserName = userName
+	emailCode, err := s.repo.SetCode(updateEmailCode)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, &model.Fail{

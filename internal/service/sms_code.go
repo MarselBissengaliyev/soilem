@@ -36,7 +36,8 @@ func (s *SMSCodeService) SetSMSCode(
 		}
 	}
 
-	smsCode, err := s.repo.SetCode(updateSMSCode, userName)
+	updateSMSCode.UserName = userName
+	smsCode, err := s.repo.SetCode(updateSMSCode)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, &model.Fail{

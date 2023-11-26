@@ -5,10 +5,19 @@ import (
 	"time"
 
 	"github.com/MarselBissengaliyev/soilem/internal/model"
+	"github.com/MarselBissengaliyev/soilem/internal/service"
 	"github.com/gin-gonic/gin"
 )
 
-func (h *Handler) registration(ctx *gin.Context) {
+type UserHandler struct {
+	services *service.Service
+}
+
+func NewUserHandler(services *service.Service) *UserHandler {
+	return &UserHandler{services}
+}
+
+func (h *UserHandler) registration(ctx *gin.Context) {
 	var user model.User
 
 	if err := ctx.BindJSON(&user); err != nil {
@@ -16,15 +25,27 @@ func (h *Handler) registration(ctx *gin.Context) {
 		return
 	}
 
-	foundUser, err := h.services.User.Registration(&user)
+	createdUser, tx, err := h.services.User.Registration(&user)
 	if err != nil {
+		newErrorResponse(ctx, err.StatusCode, err.Message)
+		return
+	}
+
+	user.Profile.Author = createdUser.UserName
+	_, err = h.services.Profile.Create(&user.Profile)
+	if err != nil {
+		if err := tx.Rollback(ctx); err != nil {
+			newErrorResponse(ctx, http.StatusInternalServerError, err.Error())
+			return
+		}
+
 		newErrorResponse(ctx, err.StatusCode, err.Message)
 		return
 	}
 
 	expiresAt := time.Now().Add(120 * time.Second)
 	sessionToken := h.services.Session.CreateSession(&model.Session{
-		UserName:  foundUser.UserName,
+		UserName:  createdUser.UserName,
 		Expiry:    expiresAt,
 		UserAgent: ctx.Request.UserAgent(),
 	})
@@ -40,7 +61,7 @@ func (h *Handler) registration(ctx *gin.Context) {
 	})
 }
 
-func (h *Handler) login(ctx *gin.Context) {
+func (h *UserHandler) login(ctx *gin.Context) {
 	var user model.User
 
 	if err := ctx.BindJSON(&user); err != nil {
@@ -72,7 +93,7 @@ func (h *Handler) login(ctx *gin.Context) {
 	})
 }
 
-func (h *Handler) logout(ctx *gin.Context) {
+func (h *UserHandler) logout(ctx *gin.Context) {
 	sessionToken, ok := ctx.Get("session_token")
 	if !ok {
 		ctx.Status(http.StatusInternalServerError)
@@ -88,10 +109,10 @@ func (h *Handler) logout(ctx *gin.Context) {
 	})
 }
 
-func (h *Handler) getUserByUserName(ctx *gin.Context) {
+func (h *UserHandler) getUserByUserName(ctx *gin.Context) {
 	userName := ctx.Param("user_name")
 
-	foundUser, err := h.services.User.GetUserByUserName((model.UserName(userName)))
+	foundUser, err := h.services.User.GetByUserName((model.UserName(userName)))
 	if err != nil {
 		newErrorResponse(ctx, err.StatusCode, err.Message)
 		return
@@ -102,7 +123,7 @@ func (h *Handler) getUserByUserName(ctx *gin.Context) {
 	})
 }
 
-func (h *Handler) getUsers(ctx *gin.Context) {
+func (h *UserHandler) getUsers(ctx *gin.Context) {
 	limit := ctx.Query("limit")
 	searchTerm := ctx.Query("search_term")
 
@@ -117,21 +138,20 @@ func (h *Handler) getUsers(ctx *gin.Context) {
 	})
 }
 
-func (h *Handler) sendSMSCode(ctx *gin.Context) {
+func (h *UserHandler) sendSMSCode(ctx *gin.Context) {
 	sessionToken, ok := ctx.Get("session_token")
-
 	if !ok {
-		ctx.Status(http.StatusInternalServerError)
+		ctx.Status(http.StatusUnauthorized)
 		return
 	}
 
 	userName, ok := h.services.Session.GetUserName(sessionToken.(string))
 	if !ok {
-		ctx.Status(http.StatusInternalServerError)
+		ctx.Status(http.StatusUnauthorized)
 		return
 	}
 
-	foundUser, err := h.services.User.GetUserByUserName((model.UserName(userName)))
+	foundUser, err := h.services.User.GetByUserName((model.UserName(userName)))
 	if err != nil {
 		newErrorResponse(ctx, err.StatusCode, err.Message)
 		return
@@ -155,7 +175,7 @@ func (h *Handler) sendSMSCode(ctx *gin.Context) {
 	})
 }
 
-func (h *Handler) confirmSMSCode(ctx *gin.Context) {
+func (h *UserHandler) confirmSMSCode(ctx *gin.Context) {
 	sessionToken, ok := ctx.Get("session_token")
 	if !ok {
 		ctx.Status(http.StatusUnauthorized)
@@ -191,7 +211,7 @@ func (h *Handler) confirmSMSCode(ctx *gin.Context) {
 	})
 }
 
-func (h *Handler) sendEmailCode(ctx *gin.Context) {
+func (h *UserHandler) sendEmailCode(ctx *gin.Context) {
 	sessionToken, ok := ctx.Get("session_token")
 
 	if !ok {
@@ -205,7 +225,7 @@ func (h *Handler) sendEmailCode(ctx *gin.Context) {
 		return
 	}
 
-	foundUser, err := h.services.User.GetUserByUserName((model.UserName(userName)))
+	foundUser, err := h.services.User.GetByUserName((model.UserName(userName)))
 	if err != nil {
 		newErrorResponse(ctx, err.StatusCode, err.Message)
 		return
@@ -233,7 +253,7 @@ func (h *Handler) sendEmailCode(ctx *gin.Context) {
 	})
 }
 
-func (h *Handler) confirmEmailCode(ctx *gin.Context) {
+func (h *UserHandler) confirmEmailCode(ctx *gin.Context) {
 	sessionToken, ok := ctx.Get("session_token")
 	if !ok {
 		ctx.Status(http.StatusUnauthorized)
@@ -269,22 +289,22 @@ func (h *Handler) confirmEmailCode(ctx *gin.Context) {
 	})
 }
 
-func (h *Handler) updatePasswordByEmailCode(ctx *gin.Context) {
+func (h *UserHandler) updatePasswordByEmailCode(ctx *gin.Context) {
 
 }
 
-func (h *Handler) updatePasswordBySMSCode(ctx *gin.Context) {
+func (h *UserHandler) updatePasswordBySMSCode(ctx *gin.Context) {
 
 }
 
-func (h *Handler) updateEmail(ctx *gin.Context) {
+func (h *UserHandler) updateEmail(ctx *gin.Context) {
 
 }
 
-func (h *Handler) updatePhone(ctx *gin.Context) {
+func (h *UserHandler) updatePhone(ctx *gin.Context) {
 
 }
 
-func (h *Handler) updateFullName(ctx *gin.Context) {
+func (h *UserHandler) updateFullName(ctx *gin.Context) {
 
 }
