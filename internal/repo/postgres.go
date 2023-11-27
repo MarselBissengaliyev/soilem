@@ -3,30 +3,36 @@ package repo
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/pkg/errors"
 )
 
 const (
-	usersTable     = "users"
-	smsCodeTable   = "sms_codes"
-	emailCodeTable = "email_codes"
-	profilesTable  = "profiles"
-	postsTable     = "posts"
+	usersTable        = "users"
+	smsCodeTable      = "sms_codes"
+	emailCodeTable    = "email_codes"
+	profilesTable     = "profiles"
+	postsTable        = "posts"
+	accessTokensTable = "access_tokens"
 )
 
-type Config struct {
+type PostgresConfig struct {
 	Host     string
 	Port     string
 	UserName string
 	Password string
 	DBName   string
+	SSLmode  string
 }
 
-func NewPostgresDB(cfg *Config, ctx context.Context) (*pgx.Conn, error) {
+func NewPostgresDB(cfg *PostgresConfig) (*pgx.Conn, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
 	connString := fmt.Sprintf(
-		"postgres://%s:%s@%s:%s/%s",
+		"postgres://%s:%s@%s:%s/%s?sslmode=disable",
 		cfg.UserName, cfg.Password, cfg.Host, cfg.Port, cfg.DBName,
 	)
 

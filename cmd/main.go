@@ -14,6 +14,16 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+// @title Soilem API
+// @version 1.0
+// @description Api Server for Soilem Application
+
+// @contact.name Marsel Bissengaliyev
+// @contact.url https://t.me/marsel_bissengaliyev
+// @contact.email marselbisengaliev1@gmail.com
+
+// @host localhost:8000
+// BasePath /
 func main() {
 	// Creating context
 	ctx, cancel := context.WithCancel(context.Background())
@@ -31,13 +41,13 @@ func main() {
 	}
 
 	// Create connection to postgres DB
-	db, err := repo.NewPostgresDB(&repo.Config{
-		Host:     cfg.Database.Host,
-		Port:     cfg.Database.Port,
-		DBName:   cfg.Database.DBName,
-		UserName: cfg.Database.Username,
-		Password: cfg.Database.Password,
-	}, ctx)
+	db, err := repo.NewPostgresDB(&repo.PostgresConfig{
+		Host:     cfg.Postgres.Host,
+		Port:     cfg.Postgres.Port,
+		DBName:   cfg.Postgres.DBName,
+		UserName: cfg.Postgres.UserName,
+		Password: cfg.Postgres.Password,
+	})
 
 	if err != nil {
 		log.Fatal(err)

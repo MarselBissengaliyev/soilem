@@ -3,6 +3,7 @@ package handlers
 import (
 	"net/http"
 
+	"github.com/MarselBissengaliyev/soilem/internal/handlers/response"
 	"github.com/MarselBissengaliyev/soilem/internal/model"
 	"github.com/MarselBissengaliyev/soilem/internal/service"
 	"github.com/gin-gonic/gin"
@@ -29,25 +30,25 @@ func (h *PostHandler) createPost(ctx *gin.Context) {
 		return
 	}
 
-	userName, ok := h.services.Session.GetUserName(sessionToken.(string))
-	if !ok {
-		ctx.Status(http.StatusUnauthorized)
+	session, fail := h.services.Session.GetByAccessToken(sessionToken.(string))
+	if fail != nil {
+		response.NewErrorResponse(ctx, fail.StatusCode, fail.Message)
 		return
 	}
 
-	foundUser, err := h.services.User.GetByUserName((model.UserName(userName)))
+	foundUser, err := h.services.User.GetByUserName(session.UserName)
 	if err != nil {
-		newErrorResponse(ctx, err.StatusCode, err.Message)
+		response.NewErrorResponse(ctx, err.StatusCode, err.Message)
 		return
 	}
 
 	createdPost, err := h.services.Post.Create(post, foundUser.UserName)
 	if err != nil {
-		newErrorResponse(ctx, err.StatusCode, err.Message)
+		response.NewErrorResponse(ctx, err.StatusCode, err.Message)
 		return
 	}
 
-	newDataResponse(ctx, http.StatusCreated, dataResponse{
+	response.NewDataResponse(ctx, http.StatusCreated, response.DataResponse{
 		"message": "post created successfully",
 		"post":    createdPost,
 	})

@@ -1,10 +1,11 @@
-port: 8080
-db:
+port: "8000"
+postgres:
   username: "postgres"
   password: "postgres"
-  host: "5432"
+  host: "localhost"
   port: "5432"
-  dbname: "soilem"
+  dbname: "soilem_db"
+  sslmode: "disable"
 twilio:
   accountSid: "ACb51855e2a4c9bfa4147c7aea6737e3da"
   authToken: "00da2d09051a03f9bd04cdf8cb7c54db"

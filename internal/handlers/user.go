@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/MarselBissengaliyev/soilem/internal/handlers/response"
 	"github.com/MarselBissengaliyev/soilem/internal/model"
 	"github.com/MarselBissengaliyev/soilem/internal/service"
 	"github.com/gin-gonic/gin"
@@ -27,7 +28,7 @@ func (h *UserHandler) registration(ctx *gin.Context) {
 
 	createdUser, tx, err := h.services.User.Registration(&user)
 	if err != nil {
-		newErrorResponse(ctx, err.StatusCode, err.Message)
+		response.NewErrorResponse(ctx, err.StatusCode, err.Message)
 		return
 	}
 
@@ -35,28 +36,28 @@ func (h *UserHandler) registration(ctx *gin.Context) {
 	_, err = h.services.Profile.Create(&user.Profile)
 	if err != nil {
 		if err := tx.Rollback(ctx); err != nil {
-			newErrorResponse(ctx, http.StatusInternalServerError, err.Error())
+			response.NewErrorResponse(ctx, http.StatusInternalServerError, err.Error())
 			return
 		}
 
-		newErrorResponse(ctx, err.StatusCode, err.Message)
+		response.NewErrorResponse(ctx, err.StatusCode, err.Message)
 		return
 	}
 
 	expiresAt := time.Now().Add(120 * time.Second)
-	sessionToken := h.services.Session.CreateSession(&model.Session{
+	accessToken, err := h.services.Session.Create(&model.Session{
 		UserName:  createdUser.UserName,
-		Expiry:    expiresAt,
+		ExpiresAt: expiresAt,
 		UserAgent: ctx.Request.UserAgent(),
 	})
 
 	http.SetCookie(ctx.Writer, &http.Cookie{
 		Name:    "session_token",
-		Value:   sessionToken,
+		Value:   accessToken,
 		Expires: expiresAt,
 	})
 
-	newDataResponse(ctx, http.StatusCreated, dataResponse{
+	response.NewDataResponse(ctx, http.StatusCreated, response.DataResponse{
 		"message": "registration successfully completed",
 	})
 }
@@ -65,30 +66,30 @@ func (h *UserHandler) login(ctx *gin.Context) {
 	var user model.User
 
 	if err := ctx.BindJSON(&user); err != nil {
-		newErrorResponse(ctx, http.StatusBadRequest, err.Error())
+		response.NewErrorResponse(ctx, http.StatusBadRequest, err.Error())
 		return
 	}
 
 	foundUser, err := h.services.User.Login(&user)
 	if err != nil {
-		newErrorResponse(ctx, err.StatusCode, err.Message)
+		response.NewErrorResponse(ctx, err.StatusCode, err.Message)
 		return
 	}
 
 	expiresAt := time.Now().Add(120 * time.Second)
-	sessionToken := h.services.Session.CreateSession(&model.Session{
+	accessToken, err := h.services.Session.Create(&model.Session{
 		UserName:  foundUser.UserName,
-		Expiry:    expiresAt,
+		ExpiresAt: expiresAt,
 		UserAgent: ctx.Request.UserAgent(),
 	})
 
 	http.SetCookie(ctx.Writer, &http.Cookie{
 		Name:    "session_token",
-		Value:   sessionToken,
+		Value:   accessToken,
 		Expires: expiresAt,
 	})
 
-	newDataResponse(ctx, http.StatusCreated, dataResponse{
+	response.NewDataResponse(ctx, http.StatusCreated, response.DataResponse{
 		"message": "login successfully completed",
 	})
 }
@@ -96,11 +97,14 @@ func (h *UserHandler) login(ctx *gin.Context) {
 func (h *UserHandler) logout(ctx *gin.Context) {
 	sessionToken, ok := ctx.Get("session_token")
 	if !ok {
-		ctx.Status(http.StatusInternalServerError)
+		ctx.Status(http.StatusUnauthorized)
 		return
 	}
 
-	h.services.Session.RemoveSession(sessionToken.(string))
+	if err := h.services.AccessToken.RemoveByAccessToken(sessionToken.(string)); err != nil {
+		response.NewErrorResponse(ctx, err.StatusCode, err.Message)
+		return
+	}
 
 	http.SetCookie(ctx.Writer, &http.Cookie{
 		Name:    "session_token",
@@ -114,11 +118,11 @@ func (h *UserHandler) getUserByUserName(ctx *gin.Context) {
 
 	foundUser, err := h.services.User.GetByUserName((model.UserName(userName)))
 	if err != nil {
-		newErrorResponse(ctx, err.StatusCode, err.Message)
+		response.NewErrorResponse(ctx, err.StatusCode, err.Message)
 		return
 	}
 
-	newDataResponse(ctx, http.StatusOK, dataResponse{
+	response.NewDataResponse(ctx, http.StatusOK, response.DataResponse{
 		"user": foundUser,
 	})
 }
@@ -129,11 +133,11 @@ func (h *UserHandler) getUsers(ctx *gin.Context) {
 
 	users, err := h.services.User.GetUsers(searchTerm, limit)
 	if err != nil {
-		newErrorResponse(ctx, err.StatusCode, err.Message)
+		response.NewErrorResponse(ctx, err.StatusCode, err.Message)
 		return
 	}
 
-	newDataResponse(ctx, http.StatusOK, dataResponse{
+	response.NewDataResponse(ctx, http.StatusOK, response.DataResponse{
 		"users": users,
 	})
 }
@@ -145,15 +149,15 @@ func (h *UserHandler) sendSMSCode(ctx *gin.Context) {
 		return
 	}
 
-	userName, ok := h.services.Session.GetUserName(sessionToken.(string))
-	if !ok {
-		ctx.Status(http.StatusUnauthorized)
+	session, fail := h.services.Session.GetByAccessToken(sessionToken.(string))
+	if fail != nil {
+		response.NewErrorResponse(ctx, fail.StatusCode, fail.Message)
 		return
 	}
 
-	foundUser, err := h.services.User.GetByUserName((model.UserName(userName)))
+	foundUser, err := h.services.User.GetByUserName(session.UserName)
 	if err != nil {
-		newErrorResponse(ctx, err.StatusCode, err.Message)
+		response.NewErrorResponse(ctx, err.StatusCode, err.Message)
 		return
 	}
 
@@ -161,16 +165,16 @@ func (h *UserHandler) sendSMSCode(ctx *gin.Context) {
 
 	smsCode, err := h.services.SMSCode.SetSMSCode(foundUser.SMSCode, foundUser.UserName)
 	if err != nil {
-		newErrorResponse(ctx, err.StatusCode, err.Message)
+		response.NewErrorResponse(ctx, err.StatusCode, err.Message)
 		return
 	}
 
 	if err := h.services.SMSCode.SendSMSConfirmation(foundUser.PhoneNumber, smsCode.Code); err != nil {
-		newErrorResponse(ctx, err.StatusCode, err.Message)
+		response.NewErrorResponse(ctx, err.StatusCode, err.Message)
 		return
 	}
 
-	newDataResponse(ctx, http.StatusOK, dataResponse{
+	response.NewDataResponse(ctx, http.StatusOK, response.DataResponse{
 		"message": "sms confirmation sended succefully",
 	})
 }
@@ -182,31 +186,31 @@ func (h *UserHandler) confirmSMSCode(ctx *gin.Context) {
 		return
 	}
 
-	userName, ok := h.services.Session.GetUserName(sessionToken.(string))
-	if !ok {
-		ctx.Status(http.StatusUnauthorized)
+	foundSession, fail := h.services.Session.GetByAccessToken(sessionToken.(string))
+	if fail != nil {
+		ctx.JSON(fail.StatusCode, fail.Message)
 		return
 	}
 
 	var smsCode model.SMSCode
 
 	if err := ctx.BindJSON(&smsCode); err != nil {
-		newErrorResponse(ctx, http.StatusBadRequest, err.Error())
+		response.NewErrorResponse(ctx, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	confirmed, err := h.services.User.ConfirmSMSCode(model.UserName(userName), smsCode)
+	confirmed, err := h.services.User.ConfirmSMSCode(foundSession.UserName, smsCode)
 	if err != nil {
-		newErrorResponse(ctx, err.StatusCode, err.Message)
+		response.NewErrorResponse(ctx, err.StatusCode, err.Message)
 		return
 	}
 
 	if !confirmed {
-		newErrorResponse(ctx, http.StatusInternalServerError, "failed to confirm sms code")
+		response.NewErrorResponse(ctx, http.StatusInternalServerError, "failed to confirm sms code")
 		return
 	}
 
-	newDataResponse(ctx, http.StatusOK, dataResponse{
+	response.NewDataResponse(ctx, http.StatusOK, response.DataResponse{
 		"message": "sms code succefully confirmed",
 	})
 }
@@ -219,15 +223,15 @@ func (h *UserHandler) sendEmailCode(ctx *gin.Context) {
 		return
 	}
 
-	userName, ok := h.services.Session.GetUserName(sessionToken.(string))
-	if !ok {
-		ctx.Status(http.StatusInternalServerError)
+	session, fail := h.services.Session.GetByAccessToken(sessionToken.(string))
+	if fail != nil {
+		response.NewErrorResponse(ctx, fail.StatusCode, fail.Message)
 		return
 	}
 
-	foundUser, err := h.services.User.GetByUserName((model.UserName(userName)))
+	foundUser, err := h.services.User.GetByUserName(session.UserName)
 	if err != nil {
-		newErrorResponse(ctx, err.StatusCode, err.Message)
+		response.NewErrorResponse(ctx, err.StatusCode, err.Message)
 		return
 	}
 
@@ -235,7 +239,7 @@ func (h *UserHandler) sendEmailCode(ctx *gin.Context) {
 
 	emailCode, err := h.services.EmailCode.SetEmailCode(foundUser.EmailCode, foundUser.UserName)
 	if err != nil {
-		newErrorResponse(ctx, err.StatusCode, err.Message)
+		response.NewErrorResponse(ctx, err.StatusCode, err.Message)
 		return
 	}
 
@@ -244,11 +248,11 @@ func (h *UserHandler) sendEmailCode(ctx *gin.Context) {
 		foundUser.Email,
 		emailCode.Code,
 	); err != nil {
-		newErrorResponse(ctx, err.StatusCode, err.Message)
+		response.NewErrorResponse(ctx, err.StatusCode, err.Message)
 		return
 	}
 
-	newDataResponse(ctx, http.StatusOK, dataResponse{
+	response.NewDataResponse(ctx, http.StatusOK, response.DataResponse{
 		"message": "email confirmation sended succefully",
 	})
 }
@@ -260,31 +264,31 @@ func (h *UserHandler) confirmEmailCode(ctx *gin.Context) {
 		return
 	}
 
-	userName, ok := h.services.Session.GetUserName(sessionToken.(string))
-	if !ok {
-		ctx.Status(http.StatusUnauthorized)
+	session, fail := h.services.Session.GetByAccessToken(sessionToken.(string))
+	if fail != nil {
+		response.NewErrorResponse(ctx, fail.StatusCode, fail.Message)
 		return
 	}
 
 	var emailCode model.EmailCode
 
 	if err := ctx.BindJSON(&emailCode); err != nil {
-		newErrorResponse(ctx, http.StatusBadRequest, err.Error())
+		response.NewErrorResponse(ctx, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	confirmed, err := h.services.User.ConfirmEmailCode(model.UserName(userName), emailCode)
+	confirmed, err := h.services.User.ConfirmEmailCode(session.UserName, emailCode)
 	if err != nil {
-		newErrorResponse(ctx, err.StatusCode, err.Message)
+		response.NewErrorResponse(ctx, err.StatusCode, err.Message)
 		return
 	}
 
 	if !confirmed {
-		newErrorResponse(ctx, http.StatusInternalServerError, "failed to confirm email code")
+		response.NewErrorResponse(ctx, http.StatusInternalServerError, "failed to confirm email code")
 		return
 	}
 
-	newDataResponse(ctx, http.StatusOK, dataResponse{
+	response.NewDataResponse(ctx, http.StatusOK, response.DataResponse{
 		"message": "email code succefully confirmed",
 	})
 }

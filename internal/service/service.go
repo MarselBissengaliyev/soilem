@@ -16,12 +16,10 @@ type User interface {
 	ConfirmEmailCode(userName model.UserName, providedCode model.EmailCode) (bool, *model.Fail)
 }
 
-type Session interface {
-	CreateSession(session *model.Session) string
-	RemoveSession(token string)
-	GetSession(token string) (*model.Session, bool)
-	GetUserName(token string) (model.UserName, bool)
-	GetUserAgent(token string) (string, bool)
+type AccessToken interface {
+	Create(session *model.AccessToken) (string, *model.Fail)
+	RemoveByAccessToken(token string) *model.Fail
+	GetByAccessToken(token string) (*model.Session, *model.Fail)
 }
 
 type SMSCode interface {
@@ -44,7 +42,7 @@ type Post interface {
 
 type Service struct {
 	User
-	Session
+	AccessToken
 	SMSCode
 	EmailCode
 	Profile
@@ -53,11 +51,11 @@ type Service struct {
 
 func NewService(r *repo.Repository, cfg *configs.Config) *Service {
 	return &Service{
-		User:      NewUserService(r.User),
-		Session:   NewSessionService(),
-		SMSCode:   NewSMSCodeService(cfg, r.SMSCode),
-		EmailCode: NewEmailCodeService(cfg, r.EmailCode),
-		Profile:   NewProfileService(r.Profile),
-		Post:      NewPostService(r.Post),
+		User:        NewUserService(r.User),
+		AccessToken: NewAccessTokenService(r.AccessToken),
+		SMSCode:     NewSMSCodeService(cfg, r.SMSCode),
+		EmailCode:   NewEmailCodeService(cfg, r.EmailCode),
+		Profile:     NewProfileService(r.Profile),
+		Post:        NewPostService(r.Post),
 	}
 }

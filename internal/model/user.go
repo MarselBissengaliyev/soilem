@@ -65,7 +65,7 @@ func (u *User) Validate() error {
 }
 
 func (u *User) HashPassword() (string, error) {
-	bytes, err := bcrypt.GenerateFromPassword([]byte(u.Password), 14)
+	bytes, err := bcrypt.GenerateFromPassword([]byte(u.Password), bcrypt.DefaultCost)
 	return string(bytes), err
 }
 

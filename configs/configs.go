@@ -1,20 +1,15 @@
 package configs
 
 import (
+	"github.com/MarselBissengaliyev/soilem/internal/repo"
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
 )
 
 type Config struct {
 	Port     string
-	Database struct {
-		Username string
-		Password string
-		Host     string
-		Port     string
-		DBName   string
-	}
-	Twilio struct {
+	Postgres repo.PostgresConfig
+	Twilio   struct {
 		AccountSid string
 		AuthToken  string
 		FromNumber string
@@ -38,5 +33,13 @@ func InitConfig(path string, ctype string, name string) (*Config, error) {
 
 	return &Config{
 		Port: viper.GetString("port"),
+		Postgres: repo.PostgresConfig{
+			UserName: viper.GetString("postgres.username"),
+			Password: viper.GetString("postgres.password"),
+			Host:     viper.GetString("postgres.host"),
+			Port:     viper.GetString("postgres.port"),
+			DBName:   viper.GetString("postgres.dbname"),
+			SSLmode:  viper.GetString("postgres.sslmode"),
+		},
 	}, nil
 }

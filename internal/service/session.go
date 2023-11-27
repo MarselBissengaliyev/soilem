@@ -1,62 +1,79 @@
 package service
 
 import (
+	"net/http"
+
 	"github.com/MarselBissengaliyev/soilem/internal/model"
+	"github.com/MarselBissengaliyev/soilem/internal/repo"
 	"github.com/MarselBissengaliyev/soilem/pkg/utils"
+	"github.com/jackc/pgx/v5"
+	"github.com/pkg/errors"
 )
 
-type SessionService struct {
-	sessions map[string]model.Session
+type AccessTokenService struct {
+	repo repo.AccessToken
 }
 
-func NewSessionService() *SessionService {
-	return &SessionService{sessions: make(map[string]model.Session)}
+func NewAccessTokenService(repo repo.AccessToken) *AccessTokenService {
+	return &AccessTokenService{repo}
 }
 
-func (s *SessionService) CreateSession(session *model.Session) string {
+func (s *AccessTokenService) Create(accessToken *model.AccessToken) (string, *model.Fail) {
 	token := utils.GenerateUniqueToken()
 
-	s.sessions[token] = model.Session{
-		UserName:  session.UserName,
-		Expiry:    session.Expiry,
-		UserAgent: session.UserAgent,
+	accessToken.Token = token
+	accessToken.HashToken()
+
+	err := s.repo.Create(accessToken)
+	if err != nil {
+		return "", &model.Fail{
+			Message:    "failed to create access token: " + err.Error(),
+			StatusCode: http.StatusInternalServerError,
+		}
 	}
 
-	return token
+	return token, nil
 }
 
-func (s *SessionService) GetUserName(token string) (model.UserName, bool) {
-	sess, ok := s.GetSession(token)
-	if !ok {
-		return "", false
+func (s *AccessTokenService) RemoveByAccessToken(accessToken string) *model.Fail {
+	if accessToken == "" {
+		return &model.Fail{
+			Message:    "access token cannot be empty",
+			StatusCode: http.StatusBadRequest,
+		}
 	}
 
-	return sess.UserName, true
+	if err := s.repo.RemoveByToken(accessToken); err != nil {
+		return &model.Fail{
+			Message:    "failed to remove access token: " + err.Error(),
+			StatusCode: http.StatusInternalServerError,
+		}
+	}
+
+	return nil
 }
 
-func (s *SessionService) GetUserAgent(token string) (string, bool) {
-	sess, ok := s.GetSession(token)
-	if !ok {
-		return "", false
+func (s *AccessTokenService) GetByAccessToken(accessToken string) (*model.Session, *model.Fail) {
+	if accessToken == "" {
+		return nil, &model.Fail{
+			Message:    "access token cannot be empty",
+			StatusCode: http.StatusBadRequest,
+		}
 	}
 
-	return sess.UserAgent, true
-}
-
-func (s *SessionService) RemoveSession(token string) {
-	delete(s.sessions, token)
-}
-
-func (s *SessionService) GetSession(token string) (*model.Session, bool) {
-	sess, exists := s.sessions[token]
-	if !exists {
-		return nil, false
+	foundSession, err := s.repo.GetByToken(accessToken)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, &model.Fail{
+				Message:    "session not found: " + err.Error(),
+				StatusCode: http.StatusNotFound,
+			}
+		}
+		return nil, &model.Fail{
+			Message:    "failed to get session: " + err.Error(),
+			StatusCode: http.StatusInternalServerError,
+		}
 	}
 
-	if sess.IsExpired() {
-		s.RemoveSession(token)
-		return nil, false
-	}
-
-	return &sess, true
+	return foundSession, nil
 }

@@ -1,9 +1,13 @@
 package handlers
 
 import (
-	"github.com/MarselBissengaliyev/soilem/internal/middleware"
+	"github.com/MarselBissengaliyev/soilem/internal/handlers/middleware"
 	"github.com/MarselBissengaliyev/soilem/internal/service"
 	"github.com/gin-gonic/gin"
+	"github.com/swaggo/gin-swagger"
+	"github.com/swaggo/files"
+
+	_ "github.com/MarselBissengaliyev/soilem/docs"
 )
 
 type Handler struct {
@@ -18,6 +22,8 @@ func (h *Handler) InitRoutes() *gin.Engine {
 	router := gin.New()
 	router.Use(gin.Logger())
 	m := middleware.NewMiddleware(h.services)
+
+	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	v1 := router.Group("/api/v1")
 

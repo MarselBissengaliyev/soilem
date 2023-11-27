@@ -1,4 +1,4 @@
-package handlers
+package response
 
 import (
 	"github.com/gin-gonic/gin"
@@ -9,13 +9,13 @@ type errorResponse struct {
 	Error string `json:"error"`
 }
 
-func newErrorResponse(c *gin.Context, statusCode int, message string) {
+func NewErrorResponse(c *gin.Context, statusCode int, message string) {
 	log.Error(message)
 	c.JSON(statusCode, errorResponse{message})
 }
 
-type dataResponse gin.H
+type DataResponse gin.H
 
-func newDataResponse(c *gin.Context, statusCode int, data dataResponse) {
+func NewDataResponse(c *gin.Context, statusCode int, data DataResponse) {
 	c.JSON(statusCode, data)
 }

@@ -31,20 +31,28 @@ type Post interface {
 	GetBySlug(slug string) (*model.Post, error)
 }
 
+type AccessToken interface {
+	Create(session *model.AccessToken) error
+	GetByToken(token string) (*model.Session, error)
+	RemoveByToken(token string) error
+}
+
 type Repository struct {
 	User
 	SMSCode
 	EmailCode
 	Post
 	Profile
+	AccessToken
 }
 
 func NewRepository(db *pgx.Conn) *Repository {
 	return &Repository{
-		User:      NewUserPostgres(db),
-		SMSCode:   NewSMSCodePostgres(db),
-		EmailCode: NewEmailCodePostgres(db),
-		Profile:   NewProfilePostgres(db),
-		Post:      NewPostPostgres(db),
+		User:        NewUserPostgres(db),
+		SMSCode:     NewSMSCodePostgres(db),
+		EmailCode:   NewEmailCodePostgres(db),
+		Profile:     NewProfilePostgres(db),
+		Post:        NewPostPostgres(db),
+		AccessToken: NewAccessTokenPostgres(db),
 	}
 }
